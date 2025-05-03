@@ -139,8 +139,26 @@ impl<S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>> Layer
                 .map(|v| v.to_owned())
                 .unwrap_or_default()
         } else {
-            JsonStorage::default()
+            let mut visitor = JsonStorage::default();
+
+            #[cfg(feature = "trace-id")]
+            {
+                #[cfg(feature = "arbitrary-precision")]
+                let uuid = uuid::Uuid::new_v4().as_u128();
+                #[cfg(not(feature = "arbitrary-precision"))]
+                let uuid = format!("{}", uuid::Uuid::new_v4().as_u128());
+
+                visitor
+                    .values
+                    .insert("trace_id", serde_json::to_value(uuid).unwrap());
+            }
+            visitor
         };
+
+        #[cfg(feature = "span-id")]
+        visitor
+            .values
+            .insert("span_id", serde_json::to_value(id.into_u64()).unwrap());
 
         let mut extensions = span.extensions_mut();
 
